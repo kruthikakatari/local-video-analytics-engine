@@ -1,0 +1,23 @@
+[
+  {
+    "id": "camera_01",
+    "name": "Laptop Webcam",
+    "type": "webcam",
+    "source": 0,
+    "enabled": true
+  },
+  {
+    "id": "camera_02",
+    "name": "Mobile Camera",
+    "type": "rtsp",
+    "source": "rtsp://192.168.1.50:8080/h264_ulaw.sdp",
+    "enabled": true
+  },
+  {
+    "id": "camera_03",
+    "name": "Demo Video",
+    "type": "file",
+    "source": "videos/people-detection.mp4",
+    "enabled": false
+  }
+]

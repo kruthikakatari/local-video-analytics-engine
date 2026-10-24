@@ -1,0 +1,19 @@
+# Computer vision / AI
+ultralytics>=8.1          # YOLOv8 (installs PyTorch)
+opencv-python>=4.8
+numpy>=1.24
+scipy>=1.10               # Hungarian matching for ByteTrack
+onnxruntime>=1.16         # optional fast CPU backend for .onnx models
+
+# Messaging
+paho-mqtt>=2.0
+
+# Backend
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-dotenv>=1.0
+psutil>=5.9               # CPU / RAM metrics
+
+# Tests
+pytest>=7.4
+httpx>=0.25               # FastAPI TestClient

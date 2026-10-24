@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Video Analytics &amp; Security Engine</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23101722'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%233987e5' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%233987e5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <!-- ============================== HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <div>
+        <h1>LOCAL VIDEO ANALYTICS &amp; SECURITY ENGINE</h1>
+        <p>Offline Edge Surveillance &amp; Disaster Management</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <label class="switch" title="Focus on finding people, spotting fire and smoke, and watching for crowds">
+        <input type="checkbox" id="disasterToggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Disaster Mode</span>
+      </label>
+      <label class="switch small-switch" title="Show networking and performance details (MQTT, WebSocket, latency)">
+        <input type="checkbox" id="techToggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Technical view</span>
+      </label>
+      <button class="icon-btn" id="soundToggle" title="Alert sound on/off">🔔</button>
+      <div class="clock" id="clock">--:--</div>
+    </div>
+  </header>
+
+  <!-- ============================== SYSTEM STATUS -->
+  <section class="statusbar" id="statusbar" aria-label="System status">
+    <div class="pill summary" id="summaryPill"><i></i><b>Checking…</b></div>
+    <div class="pill" data-key="backend"><i></i><span></span><b>…</b></div>
+    <div class="pill" data-key="websocket"><i></i><span></span><b>…</b></div>
+    <div class="pill" data-key="mqtt"><i></i><span></span><b>…</b></div>
+    <div class="pill" data-key="database"><i></i><span></span><b>…</b></div>
+    <div class="pill" data-key="ai"><i></i><span></span><b>…</b></div>
+    <div class="pill" data-key="fire"><i></i><span></span><b>…</b></div>
+    <div class="pill-group" id="cameraPills"></div>
+  </section>
+
+  <div class="disaster-banner" id="disasterBanner" hidden>
+    <strong>DISASTER MODE IS ON</strong>
+    <span>Focused on finding people, spotting fire and smoke, and watching for crowds.</span>
+  </div>
+
+  <!-- ============================== NAV -->
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="live" role="tab">Live View</button>
+    <button class="tab" data-tab="events" role="tab">Alert History</button>
+    <button class="tab" data-tab="metrics" role="tab">System Health</button>
+    <button class="tab" data-tab="config" role="tab">Settings</button>
+    <div class="tabs-spacer"></div>
+    <div class="flow-legend tech-only" title="How data travels in this system">
+      <span class="flow video">Video: RTSP / HTTP-MJPEG</span>
+      <span class="flow mqtt">Events: MQTT</span>
+      <span class="flow ws">Dashboard: WebSocket</span>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ============================== LIVE -->
+    <section class="view active" id="view-live">
+      <div class="sa-panel" id="saPanel" hidden>
+        <div class="sa-stat"><span>People visible now</span><b id="saPeople">0</b></div>
+        <div class="sa-stat"><span>People found so far</span><b id="saLocated">0</b></div>
+        <div class="sa-stat"><span>Fire or smoke right now</span><b id="saFire">0</b></div>
+        <div class="sa-stat"><span>Crowds right now</span><b id="saCrowd">0</b></div>
+        <div class="sa-gallery" id="saGallery"><span class="muted">Photos of people found, fire, smoke and crowds will appear here.</span></div>
+      </div>
+      <div class="live-layout">
+        <div class="camera-grid" id="cameraGrid"></div>
+        <aside class="panel alerts-panel">
+          <div class="panel-head">
+            <h2>Alerts</h2>
+            <span class="count-badge" id="alertCount">0</span>
+          </div>
+          <div class="alert-list" id="alertList">
+            <div class="empty">All quiet. New alerts will appear here instantly.</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============================== EVENTS -->
+    <section class="view" id="view-events">
+      <div class="panel">
+        <div class="filters">
+          <select id="fCamera"><option value="">All cameras</option></select>
+          <select id="fType">
+            <option value="">All alert types</option>
+            <option value="PERSON_DETECTED">Person spotted</option>
+            <option value="INTRUSION">Entered restricted area</option>
+            <option value="LOITERING">Staying in restricted area</option>
+            <option value="CROWD_ALERT">Crowd gathering</option>
+            <option value="FIRE_DETECTED">Fire</option>
+            <option value="SMOKE_DETECTED">Smoke</option>
+          </select>
+          <select id="fSeverity">
+            <option value="">All priorities</option>
+            <option value="critical">Urgent</option><option value="high">High</option>
+            <option value="medium">Medium</option><option value="low">Low</option>
+          </select>
+          <input type="date" id="fDate" title="Show alerts from this day">
+          <input type="search" id="fSearch" placeholder="Search alerts">
+          <button class="btn ghost" id="fReset">Clear filters</button>
+          <span class="muted" id="eventTotal"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="eventTable">
+            <thead><tr>
+              <th>When</th><th>Camera</th><th>What happened</th><th>Priority</th>
+              <th class="num">How sure</th><th class="num">Person #</th><th>Status</th><th>Photo</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <button class="btn ghost" id="prevPage">‹ Previous</button>
+          <span id="pageInfo" class="muted"></span>
+          <button class="btn ghost" id="nextPage">Next ›</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== METRICS -->
+    <section class="view" id="view-metrics">
+      <p class="intro simple-only">How well the system is running right now. Everything here is measured live on this laptop.</p>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="metrics-layout">
+        <div class="panel">
+          <div class="panel-head">
+            <h2><span class="simple-only">Video vs alert data</span><span class="tech-only">Video vs event traffic</span></h2>
+            <span class="muted small tech-only">application payload, bytes/s</span>
+          </div>
+          <p class="muted small simple-only">Live video needs a lot of network data. Alerts are tiny text messages, which is why the system can stay fast without the Internet.</p>
+          <div id="trafficChart" class="hbar-chart"></div>
+          <p class="note" id="trafficNote"></p>
+        </div>
+        <div class="panel tech-only">
+          <div class="panel-head"><h2>Alert latency by stage</h2><span class="muted small">average, ms</span></div>
+          <p class="muted small">Detection → MQTT publish → MQTT receive → WebSocket send → dashboard receive</p>
+          <div id="stageChart" class="hbar-chart"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Cameras</h2></div>
+          <div class="table-wrap"><table class="data-table" id="camMetricTable">
+            <thead><tr><th>Camera</th><th>Status</th><th class="num"><span class="simple-only">Video speed</span><span class="tech-only">Capture FPS</span></th><th class="num"><span class="simple-only">Checks per second</span><span class="tech-only">AI FPS</span></th>
+              <th class="num tech-only">Frame time (ms)</th><th class="num">People</th><th class="tech-only">Resolution</th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="note simple-only">Video speed is frames per second shown on screen. "Checks per second" is how often the AI looks at each camera.</p>
+        </div>
+        <div class="panel tech-only">
+          <div class="panel-head"><h2>MQTT messages by topic</h2></div>
+          <div class="table-wrap"><table class="data-table" id="topicTable">
+            <thead><tr><th>Topic</th><th class="num">Messages</th><th class="num">Payload bytes</th><th class="num">Avg size</th></tr></thead>
+            <tbody></tbody></table></div>
+        </div>
+        <div class="panel span-2 tech-only">
+          <div class="panel-head">
+            <h2>Recent latency samples</h2>
+            <a class="btn ghost" href="/api/metrics/export.csv" download>Export CSV</a>
+          </div>
+          <div class="table-wrap"><table class="data-table" id="latencyTable">
+            <thead><tr><th>Event ID</th><th>Event</th><th>Transport</th><th class="num">Payload (B)</th>
+              <th class="num">MQTT latency (ms)</th><th class="num">End-to-end (ms)</th></tr></thead>
+            <tbody></tbody></table></div>
+          <p class="note">All values are measured live by this system; nothing is estimated. Byte counters are application payloads, not total network bandwidth. Use Wireshark for on-the-wire traffic (see README).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== CONFIG -->
+    <section class="view" id="view-config">
+      <div class="config-layout">
+        <div class="panel">
+          <div class="panel-head"><h2>Cameras</h2></div>
+          <p class="muted small">If your phone camera stops connecting, its address may have changed. Copy the new address from the phone's camera app and paste it here.</p>
+          <div id="cameraForms"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Restricted areas</h2>
+            <select id="zoneCamera"></select>
+          </div>
+          <p class="muted small">Click on the picture to mark the corners of an area where people shouldn't go (at least 3 points). You'll get an alert when someone walks in, and another if they stay there too long.</p>
+          <div class="zone-editor">
+            <img id="zoneImage" alt="Current picture from the camera">
+            <canvas id="zoneCanvas"></canvas>
+          </div>
+          <div class="zone-controls">
+            <input id="zoneName" value="Restricted Area" placeholder="Name of this area">
+            <label><input type="checkbox" id="zoneIntrusion" checked> Alert when someone enters</label>
+            <label><input type="checkbox" id="zoneLoiter" checked> Alert when someone stays</label>
+            <button class="btn ghost" id="zoneUndo">Undo</button>
+            <button class="btn ghost" id="zoneClear">Start over</button>
+            <button class="btn ghost" id="zoneRefresh">New picture</button>
+            <button class="btn primary" id="zoneSave">Save area</button>
+          </div>
+          <div id="zoneList" class="zone-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== MODAL -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true">
+      <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <div class="toast-stack" id="toasts"></div>
+  <div class="tooltip" id="tooltip" hidden></div>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>
